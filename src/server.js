@@ -14,7 +14,7 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-// app.use("/api/auth", require("./routes/auth"));
+app.use("/api/auth", require("./routes/auth"));
 
 // Health
 app.get("/", (req, res) => res.send("API running"));
