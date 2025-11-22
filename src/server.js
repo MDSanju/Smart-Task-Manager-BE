@@ -15,6 +15,9 @@ app.use(express.json());
 
 // Routes
 app.use("/api/auth", require("./routes/auth"));
+app.use("/api/teams", require("./routes/team"));
+app.use("/api/projects", require("./routes/project"));
+app.use("/api/tasks", require("./routes/task"));
 
 // Health
 app.get("/", (req, res) => res.send("API running"));
