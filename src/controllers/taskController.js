@@ -85,23 +85,31 @@ exports.getTasks = async (req, res) => {
     if (projectId) {
       if (!mongoose.Types.ObjectId.isValid(projectId))
         return res.status(400).json({ msg: "Invalid project id" });
+
       const project = await Project.findById(projectId);
       if (!project) return res.status(404).json({ msg: "Project not found" });
       if (project.owner.toString() !== req.user.id)
         return res.status(403).json({ msg: "Access denied" });
-      filter.project = projectId;
+
+      filter.project = projectId; // let mongoose cast the string -> ObjectId
     } else {
       // If no project filter, return tasks across all projects owned by user.
-      // find user's projects ids
       const projects = await Project.find({ owner: req.user.id }).select("_id");
       const projectIds = projects.map((p) => p._id);
+
+      // If user has no projects, return empty list early
+      if (projectIds.length === 0) return res.json([]);
+
       filter.project = { $in: projectIds };
     }
 
     if (memberId) {
       if (!mongoose.Types.ObjectId.isValid(memberId))
         return res.status(400).json({ msg: "Invalid member id" });
-      filter.assignedMemberId = mongoose.Types.ObjectId(memberId);
+
+      // DON'T call ObjectId(...) directly. Let mongoose cast the string.
+      // This avoids the "Class constructor ObjectId cannot be invoked" error.
+      filter.assignedMemberId = memberId;
     }
 
     if (status) filter.status = status;
@@ -110,7 +118,7 @@ exports.getTasks = async (req, res) => {
     const tasks = await Task.find(filter).sort({ createdAt: -1 });
     return res.json(tasks);
   } catch (err) {
-    console.error(err);
+    console.error("getTasks error:", err);
     return res.status(500).send("Server error");
   }
 };
@@ -194,18 +202,22 @@ exports.deleteTask = async (req, res) => {
     return res.status(400).json({ msg: "Invalid task id" });
 
   try {
+    // fetch the task (no .lean())
     const task = await Task.findById(taskId);
     if (!task) return res.status(404).json({ msg: "Task not found" });
 
+    // verify project & ownership
     const project = await Project.findById(task.project);
     if (!project) return res.status(404).json({ msg: "Project not found" });
     if (project.owner.toString() !== req.user.id)
       return res.status(403).json({ msg: "Access denied" });
 
-    await task.remove();
+    // delete using the model (works even if `task` was a plain object)
+    await Task.deleteOne({ _id: taskId });
+
     return res.json({ msg: "Task deleted" });
   } catch (err) {
-    console.error(err);
+    console.error("deleteTask error:", err);
     return res.status(500).send("Server error");
   }
 };
